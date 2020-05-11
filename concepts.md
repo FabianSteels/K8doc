@@ -13,7 +13,7 @@ Le pod spécifie également un emsemble de volumes partagés que les conteneurs 
 
 ### 1.1 Namespace
 
-Le namespace est un cluster virtuel hebergé sur le même cluster physique. Les namespace fournissent une base pour le naming. Le nom de ressources doit être unique dans un namespace. 
+Le namespace est un cluster virtuel hebergé sur le même cluster physique. Les namespace fournissent une base pour le naming. Le nom de ressources doit être unique dans un namespace.
 
 ### 1.2 Kubelet
 
@@ -41,9 +41,9 @@ Kubernetes permet d'exposer les services de 3 manières différentes:
 * **LoadBalancer**: permet d'associer une IP à un service. On peut y associer n'importe quel protocole.
 -> cf externalip config
 
-### 3.1 Ingress concept
+### 3.1 Ingress controler concept
 
-Un Ingress n'est pas un type de service, l'ingress est un router qui se place en front des services. Il contrôle tout le traffic entrant. Istio est un controlleur d'ingress.
+Un Ingress n'est pas un type de service, l'ingress est un router qui se place en front des services. Il contrôle tout le traffic entrant. (et parfois le traffic interne - cf service Mesh)
 
 Belle illustration + plus d'[info](https://medium.com/google-cloud/kubernetes-nodeport-vs-loadbalancer-vs-ingress-when-should-i-use-what-922f010849e0)
 
@@ -55,13 +55,27 @@ Le controleur d'ingress ne démarre pas avec le cluster, il est déployé dans u
 
 Kubernetes maintient et supporte les controlleurs nginx et GCE ([Ingress Controllers - Kubernetes](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/))
 
-#### Ingress component in Istio
+**Implémentation pour K8s (outils)**
+
+Les controleurs d'ingress implémentent généralement tous un service disovery, le SSL et un support pour les sockets.
+
+Voici les implémentations les plus souvent citées:
+* traefik
+* kong
+* istio (service mesh -> controle aussi bien le trafic entrant que le trafic interne)
+* Skipper (Zalando) [lien](https://github.com/zalando/skipper)
+
+[Ingress - Kubernetes](https://kubernetes.io/fr/docs/concepts/services-networking/ingress/)
+
+[Article](https://medium.com/flant-com/comparing-ingress-controllers-for-kubernetes-9b397483b46b) permettant de comparer les ingress-components + sheet Excel
+
+#### Istio (Service Mesh)
 
 l'ingress controler d'Istio est divisé en 2 composant:
 * Gateway: est utilisé pour configurer les istio-proxies (envoy). Une gateway permet à un type de traffic spécifique de rentrer dans le cluster via les proxys envoy.
 * VirtualService: envoie le traffic à une ressource/service.
 
-la commande suivante 
+la commande suivante
 ```
 kubectl get svc istio-ingressgateway -n istio-system
 80:31380/TCP,443:31390/TCP,31400:31400/TCP,15011:32243/TCP,8060:31504/TCP,853:32380/TCP,15030:30112/TCP,15031:32472/TCP
@@ -70,16 +84,18 @@ permet de donner les redirection de port
 
 plus d'info [info](https://medium.com/faun/istio-step-by-step-part-04-traffic-routing-path-of-istio-service-mesh-part-a-ingress-routing-28e03cdaa048)
 
-#### autres Ingress component
+**/!\ l'ingressgateway** n'écoute que sur les ports qui lui ont été configurés (80, 443, grafana, kibana,...). Pour modifier ces ports il faut éditer le service:
+```
+kubectl edit svc istio-ingressgateway -n istio-system
+```
+ajouter:
+```
+name: custom
+    port: 81
+    targetPort: 81
+```
 
-il en existe d'autre comme
-* traefik
-* kong
-* istio
-
-[Ingress - Kubernetes](https://kubernetes.io/fr/docs/concepts/services-networking/ingress/)
-
-##### traefic (reverse-proxy)
+#### Traefic (reverse-proxy)
 
 Pas de besoin de fichiers de configuration pour router les services.
 
@@ -97,7 +113,7 @@ whoami:
 ### External LB concept
 
 Lorsque l'on travaille sur une infrastructure bare-metal, il faut que K8 puisse exposer une adresse ip
-* pour son ingress controller, 
+* pour son ingress controller,
 * lors qu'un service est définit en load-balancing,
 * ...
 
@@ -122,7 +138,7 @@ plus d'info: [LoadBalancer support with Minikube for Kubernetes](https://blog.co
 
 installe miniKube en 3 etapes sur mac : [Install Minikube - Kubernetes](https://kubernetes.io/docs/tasks/tools/install-minikube/#before-you-begin)
 
-Upgrade minikube version: 
+Upgrade minikube version:
 ```
 minikube version
 brew cask install minikube
@@ -142,16 +158,16 @@ concepts Minikube: [concepts minikube](https://events.static.linuxfound.org/site
 #### Administation cluster (minikube)
 ```
 minikube start
-minikube start --memory=8000 --cpus=4 
+minikube start --memory=8000 --cpus=4
 minikube stop
 
 Resetting and restarting your cluster
 -> minikube delete
 
 #interface web
-minikube dashboard 
+minikube dashboard
 
-Afficher le service Nifi 
+Afficher le service Nifi
 -> minikube service nifi
 
 Afficher la liste des services
@@ -173,10 +189,10 @@ ce fait avec le CLI `kubectl`
 ```
 #démarrer seulement un conteneur
 kubectl apply -f ./nifi.yml
-kubectl delete -f nifi/nifi.yml 
+kubectl delete -f nifi/nifi.yml
 
 Afficher la liste des pods
--> kubectl get 
+-> kubectl get
 Obtenir seulement le nom d'un POD
 -> kubectl get pod -l app=ratings -o jsonpath='{.items[0].metadata.name}'
 -> kubectl get pod --namespace logging
@@ -191,15 +207,15 @@ Afficher la liste de namespaces
 
 Supprimer tous les pod et service d'un namespace:
 -> kubectl -n default delete po,svc,deployment --all
--> si on ne supprime pas les déploiements, 
+-> si on ne supprime pas les déploiements,
 
 Afficher la liste des gateways
 -> kubectl get gateway
 
-kubectl logs my-pod 
-kubectl logs --tail=200 nifi-c8bf9844f-gqzjw 
-kubectl logs -f nifi-6f7495757b-gffqh 
-kubectl describe pods nifi-5d8477db68-tcg2z 
+kubectl logs my-pod
+kubectl logs --tail=200 nifi-c8bf9844f-gqzjw
+kubectl logs -f nifi-6f7495757b-gffqh
+kubectl describe pods nifi-5d8477db68-tcg2z
 
 kubectl exec -it nifi-c8bf9844f-gqzjw -- sh
 
@@ -209,6 +225,3 @@ Event liés à kubernetes
 ```
 kubectl cheatsheet: [kubectl Cheat Sheet - Kubernetes](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)
 hubernetes aide: [Expose Pod Information to Containers Through Files - Kubernetes](https://kubernetes.io/docs/tasks/inject-data-application/downward-api-volume-expose-pod-information/)
-
-
-
